@@ -6,21 +6,29 @@
 # - https://github.com/kireque/esphome_nebula_light/issues/8
 
 light:
+# Colored Nebula Light
   - platform: rgb
     name: "${device_name} Light"
     id: rgb_light
+    icon: mdi:aurora
     restore_mode: ALWAYS_OFF
+    default_transition_length: 1s
     red: red
     green: green
     blue: blue
     effects:
       - random:
-          transition_length: 2.5s
-          update_interval: 3s
-      - random:
-          name: Random Slow
+          name: Random
           transition_length: 10s
           update_interval: 5s
+      - random:
+          name: Party
+          transition_length: 400ms
+          update_interval: 500ms
+      - random:
+          name: Chillout
+          transition_length: 40s
+          update_interval: 30s
       - flicker:
           alpha: 95%
           intensity: 2.5%
@@ -29,13 +37,48 @@ light:
           transition_length: 30s
           min_brightness: 5%
           max_brightness: 100%
-
+      on_turn_off:
+      then:
+        if:
+          condition:
+          - light.is_off: laser
+          then:
+          - light.turn_off: motor
+# Lasers
   - platform: monochromatic
     name: "${device_name} Laser"
-    icon: mdi:laser-pointer
+    icon: mdi:star-shooting
     id: laser
     output: laser_pwm
     restore_mode: ALWAYS_OFF
+    default_transition_length: 1s
+    effects:
+      - pulse:
+          name: "Slow Breathing"
+          transition_length: 90s
+          update_interval: 120s
+          min_brightness: 0%
+          max_brightness: 10%
+      - random:
+          name: Flickering
+          transition_length: 50ms
+          update_interval: 120ms
+    on_turn_on:
+      then:
+        if:
+          condition:
+          - light.is_off: motor
+          then:
+          - light.turn_on: 
+              id: motor
+              brightness: 10%
+    on_turn_off:
+      then:
+        if:
+          condition:
+          - light.is_off: rgb_light
+          then:
+          - light.turn_off: motor
 
   # Button LED (UP/Down position, no brightness control)
   - platform: status_led
@@ -50,14 +93,20 @@ light:
     id: button_led1
     output: button_led1_pwm
     restore_mode: ALWAYS_OFF
-
-fan:
-  platform: speed
-  name: "${device_name} Motor"
-  icon: mdi:rotate-right
-  id: motor
-  output: motor_pwm
-  restore_mode: ALWAYS_OFF
+  #Rotation
+  - platform: monochromatic
+    name: "${device_name} Rotation"
+    icon: mdi:rotate-orbit
+    id: motor
+    restore_mode: ALWAYS_OFF
+    output: motor_pwm
+    gamma_correct: 1
+    default_transition_length: 0.5s
+    effects:
+      - random:
+          name: Random
+          transition_length: 30s
+          update_interval: 20s
 
 # The template switch representing the device is currently active (laser/light
 # or motor is ON).
@@ -65,7 +114,7 @@ switch:
   - platform: template
     name: "${device_name} Main Switch"
     id: switch_main
-    lambda: "return (id(motor).state || id(laser).current_values.is_on() || id(rgb_light).current_values.is_on());"
+    lambda: "return (id(motor).current_values.is_on() || id(laser).current_values.is_on() || id(rgb_light).current_values.is_on());"
 
     # Turn on using the white scene
     turn_on_action:
@@ -75,7 +124,7 @@ switch:
 
     # Completely turn off the laser, light, motor and button LED
     turn_off_action:
-      - fan.turn_off: motor
+      - light.turn_off: motor
       - light.turn_off: laser
       - light.turn_off: rgb_light
       - light.turn_off: button_led0
@@ -86,25 +135,34 @@ output:
     id: red
     pin: P9
     inverted: true
+    zero_means_zero: true
+    min_power: 0.0040
 
   - platform: libretiny_pwm
     id: green
     pin: P24
     inverted: true
+    zero_means_zero: true
+    min_power: 0.0059
 
   - platform: libretiny_pwm
     id: blue
     pin: P26
     inverted: true
+    zero_means_zero: true
+    min_power: 0.0049
 
   - platform: libretiny_pwm
     id: laser_pwm
     pin: P8
     inverted: true
+    zero_means_zero: true
+    min_power: 0.24
 
   - platform: libretiny_pwm
     id: motor_pwm
     pin: P6
+    zero_means_zero: true
     min_power: 15%
 
   - platform: gpio
@@ -156,7 +214,7 @@ script:
 
 select:
   platform: template
-  name: "${device_name} Scene"
+  name: "Scene"
   id: select_scene
   options:
     - "Scene - Red"
@@ -190,9 +248,9 @@ select:
             - light.turn_on:
                 id: laser
                 brightness: 60%
-            - fan.turn_on:
+            - light.turn_on:
                 id: motor
-                speed: 40
+                brightness: 40%
 
       # [INDEX=1]: Scene - Blue
       - if:
@@ -208,9 +266,9 @@ select:
             - light.turn_on:
                 id: laser
                 brightness: 60%
-            - fan.turn_on:
+            - light.turn_on:
                 id: motor
-                speed: 40
+                brightness: 40%
 
       # [INDEX=2]: Scene - Green
       - if:
@@ -226,9 +284,9 @@ select:
             - light.turn_on:
                 id: laser
                 brightness: 60%
-            - fan.turn_on:
+            - light.turn_on:
                 id: motor
-                speed: 40
+                brightness: 40%
 
       # [INDEX=3]: Scene - White
       - if:
@@ -244,9 +302,9 @@ select:
             - light.turn_on:
                 id: laser
                 brightness: 100%
-            - fan.turn_on:
+            - light.turn_on:
                 id: motor
-                speed: 50
+                brightness: 50%
 
       # [INDEX=4]: Scene - Dimmed
       - if:
@@ -262,6 +320,6 @@ select:
             - light.turn_on:
                 id: laser
                 brightness: 30%
-            - fan.turn_on:
+            - light.turn_on:
                 id: motor
-                speed: 10
+                brightness: 10%
